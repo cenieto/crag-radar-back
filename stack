@@ -1,0 +1,106 @@
+#!/bin/bash
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+ENTRYPOINT="/app"
+
+source ${SCRIPT_DIR}/stack.env
+
+usage(){
+	printf "Usage:\n"
+ 	printf "\t build \t\t: Build container.\n"
+ 	printf "\t up \t\t: Deploy container.\n"
+ 	printf "\t down \t\t: Destroy container.\n"
+ 	printf "\t exec \t\t: Open terminal exec inside container.\n"
+}
+
+# Build image asignning IMAGE_NAME and ENTRYPOINT variables
+# IMAGE_NAME is defined in stack.env file
+# ENTRYPOINT is defined at the beginning of this script
+build_image(){
+	stage=${1:-"dev"}
+	docker build \
+		--build-arg ENTRYPOINT=${ENTRYPOINT} \
+		-t ${IMAGE_NAME} \
+		--target ${stage} \
+        .
+}
+
+# Start and stop container
+# Usage: start_or_stop_container <up|down> [target]
+#   up   : Start container
+#   down : Stop container
+#   target : Deployment target (default: local)	
+# Following environmental variables are used from deployments/config-<target>.env file:
+#   CONTAINER_NAME : Name of the container
+#   EXPOSED_PORT  : Port exposed on the host machine
+#   CONTAINER_PORT: Port used inside the container
+start_or_stop_container() {
+    local action=$1
+	local target=${2:-"local"}
+
+    if [[ "${action}" == "up" ]]; then
+
+		env_file=${SCRIPT_DIR}/deployments/config-${target}.env
+		if [ ! -f ${env_file} ]; then
+			echo "Error: Environment file ${env_file} not found!"
+			exit 1
+		fi
+		source ${env_file}
+	
+		docker rm -f ${CONTAINER_NAME} &> /dev/null # Purge before launch
+		printf "Deploying ${CONTAINER_NAME} container...\n"
+		docker run -d -it \
+			--name "${CONTAINER_NAME}" \
+			-v ${SCRIPT_DIR}:${ENTRYPOINT} \
+			-p ${EXPOSED_PORT}:${CONTAINER_PORT} \
+			--user $(id -u):$(id -g) \
+			--env-file ${SCRIPT_DIR}/deployments/config-${target}.env \
+			${IMAGE_NAME} bash
+
+		until [ "`docker inspect -f {{.State.Status}} ${CONTAINER_NAME}`" == "running" ]; do
+			sleep 0.5;
+		done;
+
+	elif [[ "${action}" == "down" ]]; then
+		docker rm -f ${CONTAINER_NAME} &> /dev/null # Purge before launch
+	else
+		echo "Error: action (allowed values: up, down) can't be empty."
+	fi
+}
+
+# Start shell inside the container
+# Following environmental variables are used from deployments/config-<target>.env file:
+#   CONTAINER_NAME : Name of the container
+launch_exec(){
+	docker exec -it $CONTAINER_NAME sh
+}
+
+# Run bash command inside the container
+#	parameters: Command to be executed inside the container
+# Following environmental variables are used from deployments/config-<target>.env file:
+#   CONTAINER_NAME : Name of the container
+run_exec(){
+	parameters=${@}
+	docker exec $CONTAINER_NAME bash -c "${parameters}"
+}
+
+
+case "$1" in
+
+    build)
+		build_image "${@:2}"
+		;;
+	up | down)
+        start_or_stop_container "${@:1}"
+		;;
+	exec)
+		launch_exec
+		;;
+	run)
+		run_exec "${@:2}"
+		;;
+	* | -h | help)
+		usage
+		;;
+esac

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openseadragon-tiler"
+version = "0.1.0"
+description = "Tile large images into Deep Zoom (DZI) pyramids for OpenSeadragon."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    # Default backend. The "binary" extra bundles a prebuilt libvips, so no system
+    # install is needed. Note that this bundled build lacks some loaders (e.g. PDF,
+    # OpenSlide). If you need them, depend on plain "pyvips" and install libvips
+    # on your system instead.
+    "pyvips[binary]>=2.2.2",
+]
+
+[project.optional-dependencies]
+# Fallback backend (--backend pillow). Loads the whole image into memory.
+pillow = [
+    "pillow>=10.0",
+]
+
+# Installed command: `tile-image` -> src/tilers/openseadragon/cli.py:main
+[project.scripts]
+tile-image = "tilers.openseadragon.cli:main"
+
+# src layout: packages are looked up inside src/ (tilers and tilers.openseadragon).
+[tool.setuptools.packages.find]
+where = ["src"]
