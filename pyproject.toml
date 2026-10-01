@@ -16,7 +16,7 @@ dependencies = [
 [project.scripts]
 tile-image = "tilers.openseadragon.cli:main"
 
-# src layout: packages are looked up inside src/ (tilers and tilers.openseadragon).
+# src layout: packages are looked up inside src/ 
 [tool.setuptools.packages.find]
 where = ["src"]
 
@@ -24,3 +24,6 @@ where = ["src"]
 dev = [
     "pytest>=8.4.2",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

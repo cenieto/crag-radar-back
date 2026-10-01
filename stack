@@ -4,7 +4,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 ENTRYPOINT="/app"
 
-source ${SCRIPT_DIR}/stack.env
+source ${SCRIPT_DIR}/.stack
 
 usage(){
 	printf "Usage:\n"
@@ -15,7 +15,7 @@ usage(){
 }
 
 # Build image asignning IMAGE_NAME and ENTRYPOINT variables
-# IMAGE_NAME is defined in stack.env file
+# IMAGE_NAME is defined in .stack file
 # ENTRYPOINT is defined at the beginning of this script
 build_image(){
 	stage=${1:-"dev"}
@@ -86,6 +86,12 @@ run_exec(){
 }
 
 
+run_pytest(){
+	parameters=${@}
+	docker exec $CONTAINER_NAME bash -c "pytest ${parameters}"
+}
+
+
 case "$1" in
 
     build)
@@ -99,6 +105,9 @@ case "$1" in
 		;;
 	run)
 		run_exec "${@:2}"
+		;;
+	test)
+		run_pytest "${@:2}"
 		;;
 	* | -h | help)
 		usage
