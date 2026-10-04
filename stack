@@ -52,7 +52,8 @@ start_or_stop_container() {
 		printf "Deploying ${CONTAINER_NAME} container...\n"
 		docker run -d -it \
 			--name "${CONTAINER_NAME}" \
-			-v ${SCRIPT_DIR}:${ENTRYPOINT} \
+			-v ${SCRIPT_DIR}/src:${ENTRYPOINT}/src \
+			-v ${SCRIPT_DIR}/test:${ENTRYPOINT}/test \
 			-p ${EXPOSED_PORT}:${CONTAINER_PORT} \
 			--user $(id -u):$(id -g) \
 			--env-file ${SCRIPT_DIR}/deployments/config-${target}.env \
@@ -96,6 +97,16 @@ lock(){
 	docker exec $CONTAINER_NAME bash -c "uv lock"
 }
 
+run_ruff(){
+	parameters=${@}
+	docker exec $CONTAINER_NAME bash -c "RUFF_CACHE_DIR=/tmp/ruff-cache ruff check --fix ${parameters}"
+}
+
+run_mypy(){
+	parameters=${@}
+	docker exec $CONTAINER_NAME bash -c "MYPY_CACHE_DIR=/tmp/mypy-cache mypy ${parameters}"
+}
+
 
 case "$1" in
 
@@ -116,6 +127,12 @@ case "$1" in
 		;;
 	lock)
 		lock "${@:2}"
+		;;
+	ruff)
+		run_ruff "${@:2}"
+		;;
+	mypy)
+		run_mypy "${@:2}"
 		;;
 	* | -h | help)
 		usage

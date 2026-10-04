@@ -13,10 +13,12 @@ ENV UV_CACHE_DIR=/tmp/uv-cache
 WORKDIR /app
 COPY . .
 
-RUN --mount=type=cache,target=/tmp/uv-cache uv sync --locked --no-dev
+RUN --mount=type=cache,target=/tmp/uv-cache \
+    uv sync --locked --no-dev
 
 ENV PATH="/app/.venv/bin:${PATH}"
 
 FROM common AS dev
 
-RUN --mount=type=cache,target=/tmp/uv-cache uv sync --locked --dev
+RUN --mount=type=cache,target=/tmp/uv-cache \
+    uv sync --locked --dev
