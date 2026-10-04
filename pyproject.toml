@@ -9,6 +9,7 @@ description = "Tile large images into Deep Zoom (DZI) pyramids for OpenSeadragon
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "pydantic>=2.13.5",
     "pyvips[binary]>=2.2.2",
 ]
 

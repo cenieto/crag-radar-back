@@ -4,7 +4,7 @@ from typing import BinaryIO, TextIO
 
 from pydantic import BaseModel
 
-from storers.abcs import PathGeneratorAbstract
+from tmp.abcs import PathGeneratorAbstract
 
 
 class DefaultPathGeneratorConfig(BaseModel):

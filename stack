@@ -52,8 +52,7 @@ start_or_stop_container() {
 		printf "Deploying ${CONTAINER_NAME} container...\n"
 		docker run -d -it \
 			--name "${CONTAINER_NAME}" \
-			-v ${SCRIPT_DIR}/src:${ENTRYPOINT}/src \
-			-v ${SCRIPT_DIR}/test:${ENTRYPOINT}/test \
+			-v ${SCRIPT_DIR}:${ENTRYPOINT} \
 			-p ${EXPOSED_PORT}:${CONTAINER_PORT} \
 			--user $(id -u):$(id -g) \
 			--env-file ${SCRIPT_DIR}/deployments/config-${target}.env \

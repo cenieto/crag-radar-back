@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import field_validator
 
 from registry.registry import Config
-from storers.abcs import PathGeneratorAbstract, PathGeneratorConfigAbstract
+from storers.abcs import PathGeneratorAbstract, PathGeneratorConfigAbstract, NamedFile
 
 
 class DatePathGeneratorConfig(PathGeneratorConfigAbstract, Config["DatePathGenerator"]):
@@ -51,8 +51,8 @@ class DatePathGenerator(PathGeneratorAbstract):
         
     def generate_path(
         self,
-        file_object: IO,
-    ):
+        file_object: NamedFile,
+    ) -> Path:
         """Generate a path based on the current date for the given file object."""
         filename: str = Path(file_object.name).name
         date_today = datetime.now(tz=self.timezone).date()

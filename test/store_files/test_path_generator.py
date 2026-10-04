@@ -8,7 +8,7 @@ from typing import BinaryIO, TextIO
 import pytest
 from test.config import FIXTURES_DIR
 
-from storers.path_generator import DatePathGenerator, DefaultPathGenerator
+from tmp.path_generator import DatePathGenerator, DefaultPathGenerator
 
 
 class DummyFile:

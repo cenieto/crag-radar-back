@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import BinaryIO, TextIO
 
-from storers.abcs import BaseStore, PathGeneratorAbstract
+from tmp.abcs import BaseStore, PathGeneratorAbstract
 
 logger: logging.Logger = logging.getLogger(__name__)
 

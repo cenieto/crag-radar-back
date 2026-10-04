@@ -6,8 +6,8 @@ from typing import BinaryIO, TextIO
 import pytest
 from test.config import FIXTURES_DIR, TMP_DIR
 
-from storers.local import LocalStore
-from storers.path_generator import DefaultPathGenerator
+from tmp.local import LocalStore
+from tmp.path_generator import DefaultPathGenerator
 
 
 @pytest.fixture

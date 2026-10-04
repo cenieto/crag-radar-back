@@ -1,6 +1,6 @@
 """Generic registry that links classes to the class of their configuration object."""
 
-from typing import Any, Callable, ClassVar, Generic, TypeVar, overload
+from typing import Any, Callable, ClassVar, Generic, TypeVar, overload, cast
 
 T = TypeVar("T")
 C = TypeVar("C")
@@ -150,4 +150,5 @@ class RegistryClass(Generic[T]):
             KeyError: If ``type(object_config)`` has not been registered.
             TypeError: If called on ``RegistryClass`` itself.
         """
-        return cls.get(type(object_config))(object_config)
+        factory = cast("Callable[[Any], T]", cls.get(type(object_config)))
+        return factory(object_config)

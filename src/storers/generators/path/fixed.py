@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import IO, Literal
 
 from registry.registry import Config
-from storers.abcs import PathGeneratorAbstract, PathGeneratorConfigAbstract
+from storers.abcs import PathGeneratorAbstract, PathGeneratorConfigAbstract, NamedFile
 
 
 class BaseFixedPathGeneratorConfig(PathGeneratorConfigAbstract, Config["BaseFixedPathGenerator"]):
@@ -20,8 +20,8 @@ class BaseFixedPathGenerator(PathGeneratorAbstract):
         
     def generate_path(
         self,
-        file_object: IO,
-    ):
+        file_object: NamedFile,
+    ) -> Path:
         """Generate a fixed path for the given file object."""
         filename: str = Path(file_object.name).name
         full_path = Path(self.fixed_path) / filename

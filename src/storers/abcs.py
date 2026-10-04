@@ -1,38 +1,41 @@
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
+from typing import Protocol
+from typing import IO
 from pathlib import Path
-from typing import BinaryIO, TextIO
+
+from pydantic import BaseModel, ConfigDict
 
 
+class NamedFile(Protocol):
+    @property
+    def name(self) -> str: ...
+    
+        
+class BaseConfig(BaseModel):
+    """Base configuration class for path generators."""
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+
+class PathGeneratorConfigAbstract(BaseConfig):
+    """Initialize the base path generator configuration with a type identifier."""
+    type: str = "base"
+    
+    
 class PathGeneratorAbstract(ABC):
+    def __init__(
+        self, 
+        config: PathGeneratorConfigAbstract,
+    ):
+        """Initialize the path generator with a configuration object."""
+        self.config = config
+        
     @abstractmethod
     def generate_path(
-        self,
-        file_object: TextIO | BinaryIO,
+        self, 
+        file_object: NamedFile,
     ) -> Path:
-        """Generate a path for the given file object."""
+        """Generate a path based on the provided arguments."""
         pass
-
-
-class BaseStore(ABC):
-    @abstractmethod
-    def __init__(
-        self,        
-        path_generator: PathGeneratorAbstract,
-    ):
-        """Initialize the store with a path generator."""
-        self.path_generator = path_generator
-
-    @abstractmethod
-    def save(
-        self,
-        file_object: TextIO | BinaryIO,
-    ) -> Path:
-        """Save the file object to the given path.
-
-        Returns the path where the file object was saved.
-        """
-        pass
-    
     
