@@ -23,9 +23,7 @@ class LocalStore(BaseStore):
     ) -> Path:
         """Save the file object to the given path.
 
-        Returns the path where the file object was saved.
-        
-        
+        Returns the path where the file object was saved.       
         """
         try:
             path: Path = self.path_generator.generate_path(file_object)

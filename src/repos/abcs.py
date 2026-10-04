@@ -1,14 +1,19 @@
 from abc import ABC, abstractmethod
 from typing import Protocol
-from typing import IO
+from typing import TypeVar
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
 
-class NamedFile(Protocol):
+T_co = TypeVar("T_co", str, bytes, covariant=True)
+
+
+class NamedFile(Protocol[T_co]):
     @property
     def name(self) -> str: ...
+    
+    def read(self, size: int = -1, /) -> T_co: ...
     
         
 class BaseConfig(BaseModel):
@@ -34,8 +39,29 @@ class PathGeneratorAbstract(ABC):
     @abstractmethod
     def generate_path(
         self, 
-        file_object: NamedFile,
+        file_object: NamedFile[str] | NamedFile[bytes],
     ) -> Path:
         """Generate a path based on the provided arguments."""
         pass
-    
+
+
+class RepositoryConfigAbstract(BaseConfig):
+    """Base configuration class for repository objects."""
+    type: str = "base"
+
+
+class RepositoryAbstract(ABC):
+    def __init__(
+        self, 
+        config: RepositoryConfigAbstract,
+    ):
+        """Initialize the repository with a configuration object."""
+        self.config = config  
+        
+    @abstractmethod
+    def save(
+        self, 
+        file_object: NamedFile[str] | NamedFile[bytes],
+    ) -> bool:
+        """Save a file to the repository based on the provided arguments."""
+        pass    

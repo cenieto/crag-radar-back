@@ -8,15 +8,15 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import field_validator
 
 from registry.registry import Config
-from storers.abcs import PathGeneratorAbstract, PathGeneratorConfigAbstract, NamedFile
+from repos.abcs import PathGeneratorAbstract, PathGeneratorConfigAbstract, NamedFile
 
 
 class DatePathGeneratorConfig(PathGeneratorConfigAbstract, Config["DatePathGenerator"]):
     type: Literal["date"] = "date"
     base_path: Path
     timezone: str = "UTC"
-
-    @field_validator("timezone")
+    
+    @field_validator("timezone", mode="after")
     @classmethod
     def validate_timezone(cls, value: str) -> str:
         """Check that ``value`` is a valid IANA timezone name."""
@@ -28,6 +28,10 @@ class DatePathGeneratorConfig(PathGeneratorConfigAbstract, Config["DatePathGener
                 "Use an IANA name such as 'UTC' or 'Europe/Madrid'."
             ) from e
         return value
+
+    @property
+    def tzinfo(self) -> ZoneInfo:
+        return ZoneInfo(self.timezone)
     
     
 class DatePathGenerator(PathGeneratorAbstract):
@@ -37,25 +41,15 @@ class DatePathGenerator(PathGeneratorAbstract):
     ):
         """Initialize the date path generator with a configuration object."""
         self.base_path = config.base_path
-        self.timezone = self._set_timezone(config.timezone)
-        
-    def _set_timezone(self, timezone_str: str) -> ZoneInfo:
-        """Set the timezone for the date path generator."""
-        try:
-            return ZoneInfo(timezone_str)
-        except ZoneInfoNotFoundError as e:
-            raise ValueError(
-                f"Invalid timezone '{timezone_str}'. "
-                "Use an IANA name such as 'UTC' or 'Europe/Madrid'."
-            ) from e
+        self.tzinfo = config.tzinfo
         
     def generate_path(
         self,
-        file_object: NamedFile,
+        file_object: NamedFile[str] | NamedFile[bytes],
     ) -> Path:
         """Generate a path based on the current date for the given file object."""
         filename: str = Path(file_object.name).name
-        date_today = datetime.now(tz=self.timezone).date()
+        date_today = datetime.now(tz=self.tzinfo).date()
         date_subdir = date_today.strftime("%Y/%m/%d")
         
         full_path = Path(self.base_path) / date_subdir / filename
