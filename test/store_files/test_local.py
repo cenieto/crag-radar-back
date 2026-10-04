@@ -4,10 +4,10 @@ import shutil
 from typing import BinaryIO, TextIO
 
 import pytest
-
-from store_files.local import LocalStore
-from store_files.path_generator import DefaultPathGenerator
 from test.config import FIXTURES_DIR, TMP_DIR
+
+from storers.local import LocalStore
+from storers.path_generator import DefaultPathGenerator
 
 
 @pytest.fixture
@@ -19,14 +19,14 @@ def base_path() -> str:
 
 @pytest.fixture
 def test_file_name() -> str:
-    return FIXTURES_DIR / "store_files" / "example.md"
+    return FIXTURES_DIR / "storers" / "example.md"
 
 
 @pytest.fixture
 def test_file_text(
     test_file_name: str,
 ) -> TextIO | BinaryIO:
-    with open(test_file_name, "r") as f:
+    with open(test_file_name) as f:
         yield f
 
 
@@ -51,7 +51,7 @@ def test_local_store_with_default_path_generator_file_object_text(
     assert out_path    
     assert out_path.exists()
         
-    with open(test_file_name, "r") as f:
+    with open(test_file_name) as f:
         assert out_path.read_text() == f.read()
         
         
@@ -68,5 +68,5 @@ def test_local_store_with_default_path_generator_file_object_binary(
     assert out_path    
     assert out_path.exists()
         
-    with open(test_file_name, "r") as f:
+    with open(test_file_name) as f:
         assert out_path.read_text() == f.read()

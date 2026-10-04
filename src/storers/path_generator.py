@@ -2,13 +2,19 @@ import datetime
 from pathlib import Path
 from typing import BinaryIO, TextIO
 
-from store_files.abcs import BasePathGenerator
+from pydantic import BaseModel
+
+from storers.abcs import PathGeneratorAbstract
 
 
-class DefaultPathGenerator(BasePathGenerator):
+class DefaultPathGeneratorConfig(BaseModel):
+    type: str = "default"
+    base_path: Path
+    
+class DefaultPathGenerator(PathGeneratorAbstract):
     def __init__(
         self,
-        base_path: str,
+        base_path: Path,
     ):
         """Initialize the default path generator with a base path."""
         self.base_path = base_path
@@ -25,7 +31,12 @@ class DefaultPathGenerator(BasePathGenerator):
         return full_path
 
 
-class DatePathGenerator(BasePathGenerator):
+class DatePathGeneratorConfig(BaseModel):
+    type: str = "date"
+    base_path: Path
+    
+
+class DatePathGenerator(PathGeneratorAbstract):
     def __init__(
         self,
         base_path: str,

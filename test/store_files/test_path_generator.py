@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import datetime
-from pathlib import Path
 import shutil
+from pathlib import Path
 from typing import BinaryIO, TextIO
 
 import pytest
-
-from store_files.path_generator import DatePathGenerator, DefaultPathGenerator
 from test.config import FIXTURES_DIR
+
+from storers.path_generator import DatePathGenerator, DefaultPathGenerator
 
 
 class DummyFile:
@@ -37,14 +37,14 @@ def dummy_file(
 
 @pytest.fixture
 def test_file_name() -> str:
-    return FIXTURES_DIR / "store_files" / "example.md"
+    return FIXTURES_DIR / "storers" / "example.md"
 
 
 @pytest.fixture
 def test_file_text(
     test_file_name: str,
 ) -> TextIO | BinaryIO:
-    with open(test_file_name, "r") as f:
+    with open(test_file_name) as f:
         yield f
 
 

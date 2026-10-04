@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import BinaryIO, TextIO
 
 
-class BasePathGenerator(ABC):
+class PathGeneratorAbstract(ABC):
     @abstractmethod
     def generate_path(
         self,
@@ -19,7 +19,7 @@ class BaseStore(ABC):
     @abstractmethod
     def __init__(
         self,        
-        path_generator: BasePathGenerator,
+        path_generator: PathGeneratorAbstract,
     ):
         """Initialize the store with a path generator."""
         self.path_generator = path_generator

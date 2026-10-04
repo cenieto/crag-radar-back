@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import BinaryIO, TextIO
-import logging
 
-from store_files.abcs import BasePathGenerator, BaseStore
-
+from storers.abcs import BaseStore, PathGeneratorAbstract
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -13,7 +12,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 class LocalStore(BaseStore):
     def __init__(
         self,
-        path_generator: BasePathGenerator,
+        path_generator: PathGeneratorAbstract,
     ):
         """Initialize the local store with a path generator."""
         super().__init__(path_generator=path_generator)

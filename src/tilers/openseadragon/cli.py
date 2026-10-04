@@ -20,12 +20,12 @@ Requirements:
 """
 
 import argparse
+import logging
 import shutil
 import sys
 from pathlib import Path
-import logging
-import pyvips
 
+import pyvips
 
 logger = logging.getLogger(__name__)
 
