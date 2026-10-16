@@ -1,0 +1,5 @@
+RepositoryConfig:
+  type: "local"
+  PathGenerator:
+    type: "fixed"
+    path: "/tmp/test-repo"

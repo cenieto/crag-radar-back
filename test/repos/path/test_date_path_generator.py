@@ -14,13 +14,13 @@ from repos.path.date import DatePathGenerator, DatePathGeneratorConfig
 class DummyFile:
     def __init__(self, name):
         self.name = name
-        
-        
+
+
 @pytest.fixture
 def base_path() -> Path:
-    base_path: Path = Path('/test_path')
+    base_path: Path = Path("/test_path")
     return base_path
-    
+
 
 @pytest.fixture
 def dummy_file_name() -> str:
@@ -81,27 +81,26 @@ def test_date_path_generator_config_timezone_validation():
     # Invalid timezone
     with pytest.raises(ValueError):
         DatePathGeneratorConfig(base_path=Path("/test"), timezone="Invalid/Timezone")
-        
-        
+
+
 def test_date_path_generator(
     base_path: Path,
     date_path_generator: DatePathGenerator,
     dummy_file: DummyFile,
 ):
     generated_path = date_path_generator.generate_path(dummy_file)
-    
+
     timezone: str = ZoneInfo("UTC")
     date_today = datetime.now(tz=timezone).date()
     date_subdir = date_today.strftime("%Y/%m/%d")
 
     assert str(generated_path) == str(base_path / date_subdir / dummy_file.name)
-    
+
     timezone: str = ZoneInfo("Europe/Madrid")
     date_today = datetime.now(tz=timezone).date()
     date_subdir = date_today.strftime("%Y/%m/%d")
 
     assert str(generated_path) == str(base_path / date_subdir / dummy_file.name)
-    
 
 
 def test_date_path_generator_fixture_file_text(
@@ -109,14 +108,14 @@ def test_date_path_generator_fixture_file_text(
     date_path_generator: DatePathGenerator,
     test_file_text: NamedFile,
 ):
-    generated_path = date_path_generator.generate_path(test_file_text)        
-    
+    generated_path = date_path_generator.generate_path(test_file_text)
+
     timezone: str = ZoneInfo("Europe/Madrid")
     date_today = datetime.now(tz=timezone).date()
     date_subdir = date_today.strftime("%Y/%m/%d")
 
     assert str(generated_path) == str(base_path / date_subdir / Path(test_file_text.name).name)
-    
+
 
 def test_date_path_generator_fixture_file_binary(
     date_path_generator: DatePathGenerator,
@@ -124,7 +123,7 @@ def test_date_path_generator_fixture_file_binary(
     test_file_binary: NamedFile,
 ):
     generated_path = date_path_generator.generate_path(test_file_binary)
-    
+
     timezone: str = ZoneInfo("Europe/Madrid")
     date_today = datetime.now(tz=timezone).date()
     date_subdir = date_today.strftime("%Y/%m/%d")

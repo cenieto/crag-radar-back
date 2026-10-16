@@ -18,7 +18,7 @@ class PathGeneratorAbstract(ABC):
 class BaseStore(ABC):
     @abstractmethod
     def __init__(
-        self,        
+        self,
         path_generator: PathGeneratorAbstract,
     ):
         """Initialize the store with a path generator."""
@@ -34,5 +34,3 @@ class BaseStore(ABC):
         Returns the path where the file object was saved.
         """
         pass
-    
-    

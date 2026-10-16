@@ -12,13 +12,13 @@ from repos.path.fixed import FixedPathGenerator, FixedPathGeneratorConfig
 class DummyFile:
     def __init__(self, name):
         self.name = name
-        
-        
+
+
 @pytest.fixture
 def base_path() -> Path:
-    base_path: Path = Path('/test_path')
+    base_path: Path = Path("/test_path")
     return base_path
-    
+
 
 @pytest.fixture
 def dummy_file_name() -> str:
@@ -70,6 +70,7 @@ def fixed_path_generator(
         config=fixed_path_generator_config,
     )
 
+
 def test_fixed_path_generator(
     base_path: Path,
     fixed_path_generator: FixedPathGenerator,
@@ -85,9 +86,9 @@ def test_fixed_path_generator_fixture_file_text(
     fixed_path_generator: FixedPathGenerator,
     test_file_text: NamedFile,
 ):
-    generated_path = fixed_path_generator.generate_path(test_file_text)        
+    generated_path = fixed_path_generator.generate_path(test_file_text)
     assert str(generated_path) == f"{base_path}/{Path(test_file_text.name).name}"
-    
+
 
 def test_fixed_path_generator_fixture_file_binary(
     fixed_path_generator: FixedPathGenerator,
@@ -95,6 +96,5 @@ def test_fixed_path_generator_fixture_file_binary(
     test_file_binary: NamedFile,
 ):
     generated_path = fixed_path_generator.generate_path(test_file_binary)
-        
-    assert str(generated_path) == f"{base_path}/{Path(test_file_binary.name).name}"
 
+    assert str(generated_path) == f"{base_path}/{Path(test_file_binary.name).name}"

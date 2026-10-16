@@ -15,7 +15,7 @@ def test_path_generator_config_adapter() -> None:
     config: DatePathGeneratorConfig = path_generator_adapter.validate_python(config_data)
     assert isinstance(config, DatePathGeneratorConfig)
     assert config.base_path == Path("/data")
-    
+
     config_data = {"type": "fixed", "base_path": "/data"}
     config: FixedPathGeneratorConfig = path_generator_adapter.validate_python(config_data)
     assert isinstance(config, FixedPathGeneratorConfig)

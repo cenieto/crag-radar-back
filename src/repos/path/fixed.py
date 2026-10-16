@@ -2,13 +2,13 @@ from pathlib import Path
 from typing import Literal
 
 from registry.registry import Config
-from repos.abcs import PathGeneratorAbstract, PathGeneratorConfigAbstract, NamedFile
+from repos.abcs import NamedFile, PathGeneratorAbstract, PathGeneratorConfigAbstract
 
 
 class FixedPathGeneratorConfig(PathGeneratorConfigAbstract, Config["FixedPathGenerator"]):
     type: Literal["fixed"] = "fixed"
     base_path: Path
-    
+
 
 class FixedPathGenerator(PathGeneratorAbstract):
     def __init__(
@@ -17,7 +17,7 @@ class FixedPathGenerator(PathGeneratorAbstract):
     ):
         """Initialize the fixed path generator with a configuration object."""
         self.base_path: Path = config.base_path
-        
+
     def generate_path(
         self,
         file_object: NamedFile[str] | NamedFile[bytes],

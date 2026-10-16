@@ -102,4 +102,3 @@ def test_generate_with_config_marker(registry):
 
     registry.set(Model, ModelConfig)
     assert isinstance(registry.generate(ModelConfig()), Model)
-    

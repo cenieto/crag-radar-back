@@ -12,7 +12,7 @@ Output:
 
 Usage:
     tile-image map.tif -o out
-    tile-image map.tif -o out --tile-size 512 --overlap 1 --format jpg --quality 90 
+    tile-image map.tif -o out --tile-size 512 --overlap 1 --format jpg --quality 90
     python -m tilers.openseadragon.cli map.tif -o out
 
 Requirements:
@@ -51,31 +51,49 @@ def parse_args(argv=None):
     )
     parser.add_argument("input", type=Path, help="Path to the input image.")
     parser.add_argument(
-        "-o", "--output", type=Path, default=Path("tiles"),
+        "-o",
+        "--output",
+        type=Path,
+        default=Path("tiles"),
         help="Output directory.",
     )
     parser.add_argument(
-        "-n", "--name", default=None,
+        "-n",
+        "--name",
+        default=None,
         help="Base name of the output (defaults to the input file name without extension).",
     )
     parser.add_argument(
-        "-t", "--tile-size", type=int, default=254,
+        "-t",
+        "--tile-size",
+        type=int,
+        default=254,
         help="Tile size in pixels (not counting the overlap).",
     )
     parser.add_argument(
-        "--overlap", type=int, default=1,
+        "--overlap",
+        type=int,
+        default=1,
         help="Overlap in pixels between adjacent tiles.",
     )
     parser.add_argument(
-        "-f", "--format", dest="fmt", choices=["jpg", "png", "webp"], default="jpg",
+        "-f",
+        "--format",
+        dest="fmt",
+        choices=["jpg", "png", "webp"],
+        default="jpg",
         help="Tile format.",
     )
     parser.add_argument(
-        "-q", "--quality", type=int, default=85,
+        "-q",
+        "--quality",
+        type=int,
+        default=85,
         help="Quality for jpg/webp tiles (1-100).",
     )
     parser.add_argument(
-        "--overwrite", action="store_true",
+        "--overwrite",
+        action="store_true",
         help="Allow overwriting an existing output.",
     )
 

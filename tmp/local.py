@@ -23,17 +23,17 @@ class LocalStore(BaseStore):
     ) -> Path:
         """Save the file object to the given path.
 
-        Returns the path where the file object was saved.       
+        Returns the path where the file object was saved.
         """
         try:
             path: Path = self.path_generator.generate_path(file_object)
             path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             content = file_object.read()
-            
+
             if not isinstance(content, (str, bytes)):
                 raise TypeError("Unsupported file content type")
-            
+
             if isinstance(content, str):
                 path.write_text(content)
             elif isinstance(content, bytes):
@@ -41,7 +41,7 @@ class LocalStore(BaseStore):
 
             logger.info(f"File saved successfully: {path}")
             return path
-        
+
         except Exception as e:
             logger.error(f"Error saving file: {e}")
             return False
