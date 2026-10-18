@@ -3,7 +3,7 @@
 import re
 
 import pytest
-from pydantic import BaseModel, TypeAdapter, ValidationError
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 from racker.registry import Entry, Registry, RegistryBase
 
@@ -16,6 +16,7 @@ class SubClassA(BaseClass):
     """First concrete subclass of ``BaseClass``."""
 
     def __init__(self, config: "ConfigA") -> None:
+        """Store the config the object is built with."""
         self.config: ConfigA = config
 
 
@@ -52,12 +53,44 @@ class ConfigWithRequiredDiscriminator(BaseModel):
     type: str
 
 
+class ConfigWithFactoryDiscriminator(BaseModel):
+    """Config whose discriminator default comes from a ``default_factory``."""
+
+    type: str = Field(default_factory=lambda: "example_factory")
+
+
+class ConfigWithNoneDiscriminator(BaseModel):
+    """Config whose discriminator field defaults to ``None``."""
+
+    type: str | None = None
+
+
+class SubClassC(BaseClass):
+    """Third concrete subclass of ``BaseClass``, registered by no fixture."""
+
+
 class UnrelatedBaseClass:
     """Base class that differs from the registry base type."""
 
 
 class UnrelatedSubClass(UnrelatedBaseClass):
     """Subclass of ``UnrelatedBaseClass``."""
+
+
+class SubClassOfBothBases(BaseClass, UnrelatedBaseClass):
+    """Subclass of both ``BaseClass`` and ``UnrelatedBaseClass``."""
+
+
+class ConfigOfBothBasesForBaseClass(BaseModel):
+    """Config of ``SubClassOfBothBases`` under ``BaseClass``."""
+
+    type: str = "both_bases_for_base_class"
+
+
+class ConfigOfBothBasesForUnrelatedBaseClass(BaseModel):
+    """Config of ``SubClassOfBothBases`` under ``UnrelatedBaseClass``."""
+
+    type: str = "both_bases_for_unrelated_base_class"
 
 
 class UnrelatedConfig(BaseModel):
@@ -157,9 +190,29 @@ def test_entry_validate_entry_raises_when_discriminator_field_has_no_default_val
         )
 
 
-def test_entry_discriminator_is_a_class_level_constant() -> None:
+def test_entry_validate_entry_raises_when_discriminator_default_comes_from_factory() -> None:
+    """Check that a discriminator without a static default value is rejected."""
+    with pytest.raises(ValueError, match=r"must define a static default value"):
+        Entry(
+            base_class=BaseClass,
+            class_=SubClassA,
+            config_class=ConfigWithFactoryDiscriminator,
+        )
+
+
+def test_entry_validate_entry_raises_when_discriminator_defaults_to_none() -> None:
+    """Check that a discriminator defaulting to ``None`` is rejected."""
+    with pytest.raises(ValueError, match=r"must not default to None"):
+        Entry(
+            base_class=BaseClass,
+            class_=SubClassA,
+            config_class=ConfigWithNoneDiscriminator,
+        )
+
+
+def test_entry_discriminator_field_name_is_a_public_class_level_constant() -> None:
     """Check that the discriminator name is readable from the class as a plain string."""
-    assert Entry._discriminator == "type"
+    assert Entry.DISCRIMINATOR_FIELD_NAME == "type"
 
 
 # --------------------------------------------------------------------------- #
@@ -279,12 +332,36 @@ def test_registry_base_register_raises_when_discriminator_value_is_already_used(
     """Check that two config classes cannot share the same discriminator value."""
     entry_reusing_discriminator: Entry = Entry(
         base_class=BaseClass,
-        class_=SubClassA,
+        class_=SubClassC,
         config_class=ConfigReusingDiscriminatorOfA,
     )
 
     with pytest.raises(ValueError, match=r"Discriminator value 'example_a' .*? already used by"):
         registry_with_two_entries.register(entry=entry_reusing_discriminator)
+
+
+def test_registry_base_register_raises_when_class_is_registered_with_another_config_class(
+    registry_with_two_entries: RegistryBase,
+) -> None:
+    """Check that a registered class cannot be configured by a second config class."""
+    entry_reusing_class: Entry = Entry(
+        base_class=BaseClass,
+        class_=SubClassA,
+        config_class=ConfigReusingDiscriminatorOfA,
+    )
+
+    with pytest.raises(
+        ValueError, match=r"Class .*?SubClassA.*? already registered with .*?ConfigA"
+    ):
+        registry_with_two_entries.register(entry=entry_reusing_class)
+
+
+def test_registry_base_is_class_registered_tells_registered_from_unknown_classes(
+    registry_with_two_entries: RegistryBase,
+) -> None:
+    """Check that only registered classes are reported as registered."""
+    assert registry_with_two_entries.is_class_registered(class_=SubClassA)
+    assert not registry_with_two_entries.is_class_registered(class_=SubClassC)
 
 
 def test_registry_base_register_keeps_original_entry_when_config_class_is_reused(
@@ -343,19 +420,19 @@ def test_registry_base_get_entry_from_config_class_returns_none_when_config_clas
     )
 
 
-def test_registry_base_get_entry_of_type_returns_matching_entry(
+def test_registry_base_get_entry_from_class_returns_matching_entry(
     registry_with_two_entries: RegistryBase,
     entry_for_sub_class_a: Entry,
 ) -> None:
     """Check that the entry registered for a class is returned."""
-    assert registry_with_two_entries.get_entry_of_type(class_=SubClassA) == entry_for_sub_class_a
+    assert registry_with_two_entries.get_entry_from_class(class_=SubClassA) == entry_for_sub_class_a
 
 
-def test_registry_base_get_entry_of_type_returns_none_when_class_is_unknown(
+def test_registry_base_get_entry_from_class_returns_none_when_class_is_unknown(
     registry_with_two_entries: RegistryBase,
 ) -> None:
     """Check that an unregistered class yields ``None``."""
-    assert registry_with_two_entries.get_entry_of_type(class_=UnrelatedSubClass) is None
+    assert registry_with_two_entries.get_entry_from_class(class_=UnrelatedSubClass) is None
 
 
 # --------------------------------------------------------------------------- #
@@ -375,6 +452,15 @@ def test_registry_base_config_type_adapter_validates_dict_into_matching_config_c
     )
 
 
+def test_registry_base_config_type_adapter_accepts_config_instance(
+    registry_with_two_entries: RegistryBase,
+) -> None:
+    """Check that an already built config object is validated as itself."""
+    config_b: ConfigB = ConfigB()
+
+    assert registry_with_two_entries.config_type_adapter.validate_python(config_b) == config_b
+
+
 def test_registry_base_config_type_adapter_raises_when_discriminator_value_is_unknown(
     registry_with_two_entries: RegistryBase,
 ) -> None:
@@ -389,6 +475,38 @@ def test_registry_base_config_type_adapter_raises_when_discriminator_is_missing(
     """Check that data without the discriminator field is rejected."""
     with pytest.raises(ValidationError):
         registry_with_two_entries.config_type_adapter.validate_python({"value": 3})
+
+
+def test_registry_base_config_type_adapter_is_reused_between_registrations(
+    registry_with_two_entries: RegistryBase,
+) -> None:
+    """Check that reading the adapter twice returns the same object."""
+    assert (
+        registry_with_two_entries.config_type_adapter
+        is registry_with_two_entries.config_type_adapter
+    )
+
+
+def test_registry_base_config_type_adapter_is_rebuilt_when_an_entry_is_registered(
+    registry_with_two_entries: RegistryBase,
+) -> None:
+    """Check that registering an entry replaces the adapter with one that knows the new config."""
+    adapter_before_register: TypeAdapter[BaseModel] = registry_with_two_entries.config_type_adapter
+    registry_with_two_entries.register(
+        entry=Entry(
+            base_class=BaseClass,
+            class_=SubClassOfBothBases,
+            config_class=ConfigOfBothBasesForBaseClass,
+        )
+    )
+
+    adapter_after_register: TypeAdapter[BaseModel] = registry_with_two_entries.config_type_adapter
+
+    assert adapter_after_register is not adapter_before_register
+    assert (
+        adapter_after_register.validate_python({"type": "both_bases_for_base_class"})
+        == ConfigOfBothBasesForBaseClass()
+    )
 
 
 def test_registry_base_config_type_adapter_raises_when_registry_is_empty(
@@ -430,13 +548,13 @@ def test_registry_add_base_stores_an_empty_registry_base_for_the_base_class(
     empty_multi_registry: Registry,
 ) -> None:
     """Check that adding a base class creates one empty registry for it."""
-    empty_multi_registry.add_base(base_class=BaseClass)
+    added_registry_base: RegistryBase[BaseClass] = empty_multi_registry.add_base(
+        base_class=BaseClass
+    )
 
     assert empty_multi_registry.is_base_class_registered(base_class=BaseClass)
-    assert [
-        (registry_base.base_class, registry_base.config_classes)
-        for registry_base in empty_multi_registry.registry_bases
-    ] == [(BaseClass, [])]
+    assert empty_multi_registry.registry_bases == [added_registry_base]
+    assert (added_registry_base.base_class, added_registry_base.config_classes) == (BaseClass, [])
 
 
 def test_registry_instances_do_not_share_registries(
@@ -454,6 +572,47 @@ def test_registry_add_base_raises_when_base_class_is_already_registered(
 
     with pytest.raises(ValueError, match=r"Registry for .*? already registered"):
         empty_multi_registry.add_base(base_class=BaseClass)
+
+
+def test_registry_add_entry_raises_when_config_class_is_registered_under_another_base_class(
+    populated_registry: Registry,
+) -> None:
+    """Check that a config class cannot belong to two base classes."""
+    entry_reusing_config_class_of_other_base: Entry = Entry(
+        base_class=UnrelatedBaseClass,
+        class_=UnrelatedSubClass,
+        config_class=ConfigA,
+    )
+
+    with pytest.raises(ValueError, match=r"already registered for .*?SubClassA.*? another base"):
+        populated_registry.add_entry(entry=entry_reusing_config_class_of_other_base)
+
+    assert populated_registry.get_class_by_config_class(config_class=ConfigA) is SubClassA
+
+
+def test_registry_add_entry_raises_when_class_is_registered_under_another_base_class(
+    populated_registry: Registry,
+) -> None:
+    """Check that a class cannot be configured under two base classes."""
+    populated_registry.register(
+        class_=SubClassOfBothBases,
+        config_class=ConfigOfBothBasesForBaseClass,
+        base_class=BaseClass,
+    )
+
+    with pytest.raises(
+        ValueError, match=r"Class .*?SubClassOfBothBases.*? already registered .*? another base"
+    ):
+        populated_registry.register(
+            class_=SubClassOfBothBases,
+            config_class=ConfigOfBothBasesForUnrelatedBaseClass,
+            base_class=UnrelatedBaseClass,
+        )
+
+    assert (
+        populated_registry.get_config_class_by_class(class_=SubClassOfBothBases)
+        is ConfigOfBothBasesForBaseClass
+    )
 
 
 def test_registry_add_entry_raises_when_base_class_has_no_registry(
@@ -542,6 +701,21 @@ def test_registry_register_stores_classes_in_registry_of_base_class(
 
     assert empty_multi_registry.get_class_by_config_class(config_class=ConfigA) is SubClassA
     assert empty_multi_registry.get_config_class_by_class(class_=SubClassA) is ConfigA
+
+
+def test_registry_register_returns_the_registered_entry(
+    empty_multi_registry: Registry,
+    entry_for_sub_class_a: Entry,
+) -> None:
+    """Check that the returned entry is the one stored in the registry of its base class."""
+    registry_base: RegistryBase[BaseClass] = empty_multi_registry.add_base(base_class=BaseClass)
+
+    registered_entry: Entry[BaseClass] = empty_multi_registry.register(
+        class_=SubClassA, config_class=ConfigA, base_class=BaseClass
+    )
+
+    assert registered_entry == entry_for_sub_class_a
+    assert registry_base.get_entry_from_config_class(config_class=ConfigA) == registered_entry
 
 
 def test_registry_register_raises_when_base_class_has_no_registry(

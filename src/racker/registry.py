@@ -23,7 +23,7 @@ class Entry(BaseModel, Generic[BaseT]):
             It must declare the discriminator field with a default value.
     """
 
-    _discriminator: ClassVar[str] = "type"
+    DISCRIMINATOR_FIELD_NAME: ClassVar[str] = "type"
 
     base_class: type[BaseT]
     class_: type[BaseT]
@@ -39,15 +39,16 @@ class Entry(BaseModel, Generic[BaseT]):
         Raises:
             ValueError: If ``class_`` is not a subclass of ``base_class``, if
                 ``config_class`` has no discriminator field, or if the
-                discriminator field has no default value.
+                discriminator field has no static, non-``None`` default value.
         """
         if not issubclass(self.class_, self.base_class):
             raise ValueError(f"{self.class_} is not a subclass of {self.base_class}")
 
-        discriminator_field_name: str = self._discriminator
+        discriminator_field_name: str = self.DISCRIMINATOR_FIELD_NAME
         config_fields: dict[str, FieldInfo] = self.config_class.model_fields
 
-        if discriminator_field_name not in config_fields:
+        discriminator_is_in_config_fields: bool = discriminator_field_name in config_fields
+        if not discriminator_is_in_config_fields:
             raise ValueError(
                 f"{self.config_class} has no discriminator field: {discriminator_field_name!r}"
             )
@@ -59,11 +60,29 @@ class Entry(BaseModel, Generic[BaseT]):
                 "must define a default value"
             )
 
+        has_default_factory: bool = discriminator_field.default_factory is not None
+        if has_default_factory:
+            raise ValueError(
+                f"{self.config_class} discriminator field {discriminator_field_name!r} "
+                "must define a static default value, not a default_factory"
+            )
+
+        is_default_none: bool = discriminator_field.default is None
+        if is_default_none:
+            raise ValueError(
+                f"{self.config_class} discriminator field {discriminator_field_name!r} "
+                "must not default to None"
+            )
+
         return self
 
 
 class RegistryBase(Generic[BaseT]):
-    """Registry of entries that share the same base class and have unique config classes.
+    """Registry of entries that share the same base class.
+
+    Classes and config classes are in a one-to-one relationship: each class is
+    registered with exactly one config class, and each config class with exactly
+    one class.
 
     The registry is generic over ``BaseT``, its base class, which is inferred from
     the ``base_class`` given at construction. Returned classes are typed as
@@ -81,6 +100,7 @@ class RegistryBase(Generic[BaseT]):
         """
         self._base_class: type[BaseT] = base_class
         self._entries: dict[type[BaseModel], Entry[BaseT]] = {}
+        self._config_type_adapter: TypeAdapter[BaseModel] | None = None
 
     @property
     def base_class(
@@ -121,9 +141,8 @@ class RegistryBase(Generic[BaseT]):
     ) -> TypeAdapter[BaseModel]:
         """Return a type adapter that validates data into any registered config class.
 
-        The adapter is a tagged union of every registered config class. The tag of
-        each config class is the default value of its discriminator field, and the
-        input data selects the config class through the value of that same field.
+        The adapter is built when an entry is registered and reused until the next
+        registration.
 
         Returns:
             TypeAdapter[BaseModel]: Adapter over the union of the registered config classes.
@@ -131,10 +150,23 @@ class RegistryBase(Generic[BaseT]):
         Raises:
             ValueError: If the registry has no entries.
         """
-        has_no_entries: bool = len(self._entries) == 0
-        if has_no_entries:
+        config_type_adapter: TypeAdapter[BaseModel] | None = self._config_type_adapter
+        is_adapter_missing: bool = config_type_adapter is None
+        if is_adapter_missing:
             raise ValueError(f"Registry for {self._base_class} has no entries")
+        return cast(TypeAdapter[BaseModel], config_type_adapter)
 
+    def _build_config_type_adapter(
+        self,
+    ) -> TypeAdapter[BaseModel]:
+        """Build a type adapter over the tagged union of the registered config classes.
+
+        The tag of each config class is the default value of its discriminator field,
+        and the input data selects the config class through the value of that same field.
+
+        Returns:
+            TypeAdapter[BaseModel]: Adapter over the union of the registered config classes.
+        """
         tagged_config_classes: tuple[Any, ...] = tuple(
             Annotated[
                 config_class,
@@ -143,7 +175,7 @@ class RegistryBase(Generic[BaseT]):
             for config_class in self._entries
         )
         config_classes_union: Any = Annotated[
-            Union[tagged_config_classes],  # noqa: UP007  (a tuple cannot be joined with ``|``)
+            Union[tagged_config_classes],  # noqa: UP007
             Discriminator(self._get_discriminator_value_of_data),
         ]
         return TypeAdapter(config_classes_union)
@@ -160,7 +192,7 @@ class RegistryBase(Generic[BaseT]):
         Returns:
             str: The default value of the discriminator field, as a string.
         """
-        discriminator_field: FieldInfo = config_class.model_fields[Entry._discriminator]
+        discriminator_field: FieldInfo = config_class.model_fields[Entry.DISCRIMINATOR_FIELD_NAME]
         return str(discriminator_field.default)
 
     @staticmethod
@@ -177,9 +209,9 @@ class RegistryBase(Generic[BaseT]):
         """
         is_raw_dictionary: bool = isinstance(data, dict)
         discriminator_value: Any = (
-            data.get(Entry._discriminator)
+            data.get(Entry.DISCRIMINATOR_FIELD_NAME)
             if is_raw_dictionary
-            else getattr(data, Entry._discriminator, None)
+            else getattr(data, Entry.DISCRIMINATOR_FIELD_NAME, None)
         )
         is_discriminator_missing: bool = discriminator_value is None
         return None if is_discriminator_missing else str(discriminator_value)
@@ -212,6 +244,20 @@ class RegistryBase(Generic[BaseT]):
         """
         return config_class in self._entries
 
+    def is_class_registered(
+        self,
+        class_: type,
+    ) -> bool:
+        """Tell whether a class is already registered.
+
+        Args:
+            class_: Class to look for.
+
+        Returns:
+            bool: ``True`` if an entry is registered for ``class_``.
+        """
+        return class_ in self.classes_
+
     def is_entry_of_base_type(
         self,
         entry: Entry[Any],
@@ -237,9 +283,9 @@ class RegistryBase(Generic[BaseT]):
 
         Raises:
             ValueError: If the entry is already registered, if its base class
-                differs from the registry base class, if its config class is
-                already registered for another class, or if its discriminator
-                value is already used by another config class.
+                differs from the registry base class, if its config class or its
+                class is already registered, or if its discriminator value is
+                already used by another config class.
         """
         is_already_registered: bool = self.is_entry_registered(
             entry=entry,
@@ -253,13 +299,25 @@ class RegistryBase(Generic[BaseT]):
         if not is_of_registry_base_type:
             raise ValueError(f"Entry for {entry.class_} is not of base class: {self._base_class}")
 
-        is_config_class_taken: bool = self.is_config_class_registered(
+        is_config_class_registered: bool = self.is_config_class_registered(
             config_class=entry.config_class,
         )
-        if is_config_class_taken:
+        if is_config_class_registered:
             conflicting_class: type = self._entries[entry.config_class].class_
             raise ValueError(
                 f"Config class {entry.config_class} already registered for {conflicting_class}"
+            )
+
+        is_class_registered: bool = self.is_class_registered(
+            class_=entry.class_,
+        )
+        if is_class_registered:
+            conflicting_config_class: type[BaseModel] = cast(
+                Entry[BaseT],
+                self.get_entry_from_class(class_=entry.class_),
+            ).config_class
+            raise ValueError(
+                f"Class {entry.class_} already registered with {conflicting_config_class}"
             )
 
         discriminator_value: str = self._get_discriminator_value_of_config_class(entry.config_class)
@@ -292,6 +350,7 @@ class RegistryBase(Generic[BaseT]):
             entry=entry,
         )
         self._entries[entry.config_class] = entry
+        self._config_type_adapter = self._build_config_type_adapter()
 
     def get_entry_from_config_class(
         self,
@@ -308,7 +367,7 @@ class RegistryBase(Generic[BaseT]):
         """
         return self._entries.get(config_class)
 
-    def get_entry_of_type(
+    def get_entry_from_class(
         self,
         class_: type,
     ) -> Entry[BaseT] | None:
@@ -365,11 +424,14 @@ class Registry:
     def add_base(
         self,
         base_class: type[BaseT],
-    ) -> None:
+    ) -> RegistryBase[BaseT]:
         """Create and store an empty registry for a base class.
 
         Args:
             base_class: Base class the new registry manages.
+
+        Returns:
+            RegistryBase[BaseT]: The new, empty registry of ``base_class``.
 
         Raises:
             ValueError: If a registry for ``base_class`` already exists.
@@ -381,6 +443,7 @@ class Registry:
             raise ValueError(f"Registry for {base_class} already registered")
         registry_base: RegistryBase[BaseT] = RegistryBase(base_class=base_class)
         self._registries[base_class] = registry_base
+        return registry_base
 
     def add_entry(
         self,
@@ -393,21 +456,68 @@ class Registry:
 
         Raises:
             KeyError: If no registry exists for ``entry.base_class``.
-            ValueError: If the entry cannot be registered (see ``RegistryBase.register``).
+            ValueError: If the config class or the class is already registered under
+                another base class, or if the entry cannot be registered (see
+                ``RegistryBase.register``).
         """
         registry_base: RegistryBase[BaseT] = self._get_registry_base(
             base_class=entry.base_class,
         )
+        self._check_entry_is_unique_across_bases(
+            entry=entry,
+            registry_base=registry_base,
+        )
         registry_base.register(
             entry=entry,
         )
+
+    def _check_entry_is_unique_across_bases(
+        self,
+        entry: Entry[BaseT],
+        registry_base: RegistryBase[BaseT],
+    ) -> None:
+        """Check that neither class of an entry is registered under another base class.
+
+        Args:
+            entry: Entry to check.
+            registry_base: Registry of the entry base class.
+
+        Raises:
+            ValueError: If the config class or the class is already registered under
+                another base class.
+        """
+        conflicting_class: type | None = self.get_class_by_config_class(
+            config_class=entry.config_class,
+        )
+        is_config_class_in_another_base: bool = (
+            conflicting_class is not None
+            and not registry_base.is_config_class_registered(config_class=entry.config_class)
+        )
+        if is_config_class_in_another_base:
+            raise ValueError(
+                f"Config class {entry.config_class} already registered for "
+                f"{conflicting_class} under another base class"
+            )
+
+        conflicting_config_class: type[BaseModel] | None = self.get_config_class_by_class(
+            class_=entry.class_,
+        )
+        is_class_in_another_base: bool = (
+            conflicting_config_class is not None
+            and not registry_base.is_class_registered(class_=entry.class_)
+        )
+        if is_class_in_another_base:
+            raise ValueError(
+                f"Class {entry.class_} already registered with "
+                f"{conflicting_config_class} under another base class"
+            )
 
     def register(
         self,
         class_: type[BaseT],
         config_class: type[BaseModel],
         base_class: type[BaseT],
-    ) -> None:
+    ) -> Entry[BaseT]:
         """Register a class and its config class in the registry of its base class.
 
         Args:
@@ -415,10 +525,13 @@ class Registry:
             config_class: Pydantic model describing the configuration of ``class_``.
             base_class: Base class whose registry receives the entry.
 
+        Returns:
+            Entry[BaseT]: The entry built from the given classes and registered.
+
         Raises:
             pydantic.ValidationError: If the classes do not form a valid ``Entry``.
             KeyError: If no registry exists for ``base_class``.
-            ValueError: If the entry cannot be registered (see ``RegistryBase.register``).
+            ValueError: If the entry cannot be registered (see ``add_entry``).
         """
         entry: Entry[BaseT] = Entry(
             base_class=base_class,
@@ -428,6 +541,7 @@ class Registry:
         self.add_entry(
             entry=entry,
         )
+        return entry
 
     def _get_registry_base(
         self,
@@ -488,7 +602,7 @@ class Registry:
         """
         registry_base: RegistryBase[Any]
         for registry_base in self.registry_bases:
-            entry: Entry[Any] | None = registry_base.get_entry_of_type(
+            entry: Entry[Any] | None = registry_base.get_entry_from_class(
                 class_=class_,
             )
             is_entry_found: bool = entry is not None

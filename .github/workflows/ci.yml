@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        experimental: [false]
+        include:
+          # Locked dependencies (pydantic-core) have no Python 3.15 wheels yet.
+          - python-version: "3.15"
+            experimental: true
+    env:
+      PYTHON_IMAGE_VERSION: ${{ matrix.python-version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: ./stack build
+
+      - name: Deploy container
+        run: ./stack up ci
+
+      - name: Run tests
+        run: ./stack test -v
+
+      - name: Remove container
+        if: always()
+        run: ./stack down
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: ./stack build
+
+      - name: Deploy container
+        run: ./stack up ci
+
+      - name: Build documentation
+        run: ./stack docs
+
+      - name: Remove container
+        if: always()
+        run: ./stack down

@@ -21,4 +21,4 @@ ENV PATH="/app/.venv/bin:${PATH}"
 FROM common AS dev
 
 RUN --mount=type=cache,target=/tmp/uv-cache \
-    uv sync --locked --dev
+    uv sync --locked --dev --group docs

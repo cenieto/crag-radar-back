@@ -7,7 +7,7 @@ name = "openseadragon-tiler"
 version = "0.1.0"
 description = "Tile large images into Deep Zoom (DZI) pyramids for OpenSeadragon."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.13.5",
     "pyvips[binary]>=2.2.2",
@@ -27,9 +27,19 @@ dev = [
     "pytest>=8.4.2",
     "ruff>=0.16.10",
 ]
+docs = [
+    "mkdocs>=1.6.1,<2",  # MkDocs 2 drops support for the plugins and theme used here
+    "mkdocs-material>=9.6.0",
+    "mkdocstrings[python]>=0.29.0",
+    "mkdocs-gen-files>=0.5.0",
+    "mkdocs-literate-nav>=0.6.1",
+    "pymdown-extensions>=10.14,<12",  # 12.x breaks mkdocstrings 1.0 highlighting
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+testpaths = ["test"]
+norecursedirs = [".*", "fixtures", "tmp", "__pycache__"]  # fixtures hold input data, not tests
 
 [tool.ruff]
 line-length = 100

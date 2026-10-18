@@ -4,26 +4,39 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 ENTRYPOINT="/app"
 
+# PYTHON_IMAGE_VERSION set in the environment overrides the value in .stack
+PYTHON_IMAGE_VERSION_OVERRIDE=${PYTHON_IMAGE_VERSION:-}
 source ${SCRIPT_DIR}/.stack
+PYTHON_IMAGE_VERSION=${PYTHON_IMAGE_VERSION_OVERRIDE:-${PYTHON_IMAGE_VERSION}}
 
 usage(){
-	printf "Usage:\n"
- 	printf "\t build \t\t: Build container.\n"
- 	printf "\t up \t\t: Deploy container.\n"
- 	printf "\t down \t\t: Destroy container.\n"
- 	printf "\t exec \t\t: Open terminal exec inside container.\n"
+	printf "Usage: ./stack <command> [arguments]\n"
+	printf "\t build [stage] \t: Build image (stage: dev (default) | common).\n"
+	printf "\t up [target] \t: Deploy container with deployments/config-<target>.env (default: local).\n"
+	printf "\t down \t\t: Destroy container.\n"
+	printf "\t exec \t\t: Open terminal exec inside container.\n"
+	printf "\t run <command> \t: Run command inside container.\n"
+	printf "\t test [args] \t: Run pytest inside container.\n"
+	printf "\t ruff [args] \t: Run ruff check --fix inside container.\n"
+	printf "\t format [args] \t: Run ruff format inside container.\n"
+	printf "\t mypy [args] \t: Run mypy inside container.\n"
+	printf "\t docs [args] \t: Build documentation into site/ inside container.\n"
+	printf "\t lock \t\t: Update uv.lock inside container.\n"
+	printf "Set PYTHON_IMAGE_VERSION in the environment to override the value in .stack.\n"
 }
 
-# Build image asignning IMAGE_NAME and ENTRYPOINT variables
-# IMAGE_NAME is defined in .stack file
+# Build image asignning IMAGE_NAME, PYTHON_IMAGE_VERSION and ENTRYPOINT variables
+# IMAGE_NAME and PYTHON_IMAGE_VERSION are defined in .stack file; PYTHON_IMAGE_VERSION can be
+# overridden from the environment
 # ENTRYPOINT is defined at the beginning of this script
 build_image(){
 	stage=${1:-"dev"}
 	docker build \
 		--build-arg ENTRYPOINT=${ENTRYPOINT} \
+		--build-arg PYTHON_IMAGE_VERSION=${PYTHON_IMAGE_VERSION} \
 		-t ${IMAGE_NAME} \
 		--target ${stage} \
-        .
+		${SCRIPT_DIR}
 }
 
 # Start and stop container
@@ -35,6 +48,8 @@ build_image(){
 #   CONTAINER_NAME : Name of the container
 #   EXPOSED_PORT  : Port exposed on the host machine
 #   CONTAINER_PORT: Port used inside the container
+# The project is mounted at ENTRYPOINT; the anonymous volume on ENTRYPOINT/.venv keeps the
+# virtual environment built in the image instead of the host one.
 start_or_stop_container() {
     local action=$1
 	local target=${2:-"local"}
@@ -53,10 +68,12 @@ start_or_stop_container() {
 		docker run -d -it \
 			--name "${CONTAINER_NAME}" \
 			-v ${SCRIPT_DIR}:${ENTRYPOINT} \
+			-v ${ENTRYPOINT}/.venv \
 			-p ${EXPOSED_PORT}:${CONTAINER_PORT} \
 			--user $(id -u):$(id -g) \
 			--env-file ${SCRIPT_DIR}/deployments/config-${target}.env \
-			${IMAGE_NAME} bash
+			${IMAGE_NAME} bash \
+			|| exit 1
 
 		until [ "`docker inspect -f {{.State.Status}} ${CONTAINER_NAME}`" == "running" ]; do
 			sleep 0.5;
@@ -106,6 +123,11 @@ run_mypy(){
 	docker exec $CONTAINER_NAME bash -c "MYPY_CACHE_DIR=/tmp/mypy-cache mypy ${parameters}"
 }
 
+run_docs(){
+	parameters=${@}
+	docker exec $CONTAINER_NAME bash -c "mkdocs build --strict ${parameters}"
+}
+
 run_format(){
 	parameters=${@}
 	docker exec $CONTAINER_NAME bash -c "RUFF_CACHE_DIR=/tmp/ruff-cache ruff format ${parameters}"
@@ -140,6 +162,9 @@ case "$1" in
 		;;
 	mypy)
 		run_mypy "${@:2}"
+		;;
+	docs)
+		run_docs "${@:2}"
 		;;
 	* | -h | help)
 		usage

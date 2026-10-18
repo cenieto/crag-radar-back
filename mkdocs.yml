@@ -1,0 +1,66 @@
+site_name: crag-radar-back
+site_description: Backend of Crag Radar.
+repo_url: https://github.com/cenieto/crag-radar-back
+edit_uri: edit/main/
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Racker: racker.md
+  - API reference: reference/
+
+plugins:
+  - search
+  - gen-files:
+      scripts:
+        - docs/scripts/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_signature_annotations: true
+            separate_signature: true
+            merge_init_into_class: true
+            members_order: source
+            filters: []
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: [.]
+      check_paths: true
+
+exclude_docs: |
+  scripts/
