@@ -648,3 +648,6 @@ class Registry:
             entry.class_,
         )
         return class_constructor(config)
+
+
+racker: Registry = Registry()

@@ -135,7 +135,7 @@ storage: Storage = registry.instantiate_from_dict(
 )
 ```
 
-It has three classes:
+`racker.registry` has three classes:
 
 - **`Entry`** links a class, its base class and its config class. It checks that the
   class derives from the base class, and that the config class has a `type` field with a
@@ -145,6 +145,25 @@ It has three classes:
   a `type` value. It turns a dictionary into the matching config object.
 - **`Registry`** holds one `RegistryBase` per base class. It registers classes, looks up a
   class from its config class and back, and builds objects from dictionaries.
+
+`racker.validators` has **`Registered`**, a marker for pydantic fields. A field
+annotated with it accepts a configuration dictionary and holds the object built from it:
+
+```python
+from typing import Annotated
+
+from racker.registry import BaseT
+from racker.validators import Registered
+
+Built = Annotated[BaseT, Registered(registry=registry)]
+
+
+class AppConfig(BaseModel):
+    storage: Built[Storage]
+
+
+app_config: AppConfig = AppConfig.model_validate({"storage": {"type": "local", "root": "/data"}})
+```
 
 Each `Registry` instance is independent, and every lookup is fully typed. See the
 **Racker** tab of the documentation for the full explanation and the **API reference**

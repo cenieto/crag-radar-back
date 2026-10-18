@@ -4,8 +4,10 @@
 object from a plain dictionary, such as one loaded from a JSON or YAML file, without
 knowing its class in advance.
 
-All the code lives in `racker.registry`. The [API reference](reference/racker/registry.md)
-lists every class and method.
+The registry lives in `racker.registry`, and its pydantic integration in
+`racker.validators`. The API reference lists every class and method of
+[`racker.registry`](reference/racker/registry.md) and
+[`racker.validators`](reference/racker/validators.md).
 
 ## Concepts
 
@@ -16,11 +18,16 @@ lists every class and method.
 | **Config class** | A pydantic `BaseModel` that describes the settings of one class, for example `LocalStorageConfig`. |
 | **Discriminator** | The `type` field of every config class. Its default value names the config class, and the `type` value of a dictionary selects which config class reads it. The field name is in `Entry.DISCRIMINATOR_FIELD_NAME`. |
 
-The module has three classes, each built on the one before:
+`racker.registry` has three classes, each built on the one before:
 
 - [`Entry`][racker.registry.Entry]: one class, its base class and its config class.
 - [`RegistryBase`][racker.registry.RegistryBase]: the entries of a single base class.
 - [`Registry`][racker.registry.Registry]: one `RegistryBase` per base class.
+
+`racker.validators` has one class:
+
+- [`Registered`][racker.validators.Registered]: a marker for pydantic fields that builds
+  their objects from configuration dictionaries through a `Registry`.
 
 ## Usage
 
@@ -100,6 +107,79 @@ registry.get_config_class_by_class(class_=LocalStorage)            # LocalStorag
 
 Both methods search the registries of every base class and return `None` when nothing
 matches.
+
+### 5. Use registered objects in pydantic models
+
+To let a model field accept a configuration dictionary and hold the built object, use
+the [`Registered`][racker.validators.Registered] marker. Declare a generic alias once per
+registry, then name the base class in each field:
+
+```python
+from typing import Annotated
+
+from pydantic import BaseModel
+
+from racker.registry import BaseT
+from racker.validators import Registered
+
+Built = Annotated[BaseT, Registered(registry=registry)]
+
+
+class AppConfig(BaseModel):
+    storage: Built[Storage]
+    backup_storage: Built[Storage] | None = None
+    mirror_storages: list[Built[Storage]] = []
+
+
+app_config: AppConfig = AppConfig.model_validate(
+    {
+        "storage": {"type": "s3", "bucket": "climbing-photos"},
+        "mirror_storages": [{"type": "local", "root": "/mirror"}],
+    }
+)
+assert isinstance(app_config.storage, S3Storage)
+```
+
+`Built[Storage]` means `Annotated[Storage, Registered(registry)]`:
+
+- **Pydantic** passes `Storage` to the marker, which uses it as the `base_class` of
+  `instantiate_from_dict`. Each dictionary in the field is built into an object. Objects
+  that are already built are kept, as long as they are instances of `Storage`.
+- **Type checkers** ignore the marker and see `storage` as a `Storage`,
+  `backup_storage` as `Storage | None`, and `mirror_storages` as `list[Storage]`.
+
+The model needs neither `arbitrary_types_allowed` nor a validator. The registry is read
+when data is validated, so classes can be registered after the model is defined.
+`Registered` also works with `TypeAdapter` and pydantic dataclasses.
+
+!!! note "Declare the alias at module level"
+    Write `Built = Annotated[BaseT, Registered(registry=registry)]` directly. Type
+    checkers only recognise an alias written as `Annotated[...]`, not one returned by a
+    function.
+
+!!! note "Passing dictionaries to the constructor"
+    `AppConfig(storage={...})` works at runtime, but type checkers expect a `Storage`
+    there. Use `AppConfig.model_validate(data)` for raw data, or enable pydantic's mypy
+    plugin (`plugins = ["pydantic.mypy"]` under `[tool.mypy]`), which accepts any value
+    in the constructor.
+
+`Registered` only annotates a class. Use it inside other types, as in
+`list[Built[Storage]]`, rather than around them: `Annotated[list[Storage], Registered(...)]`
+raises `TypeError` when the model is defined.
+
+Validating a `Registered` field fails with `pydantic.ValidationError`, naming the field,
+when:
+
+- the value is neither a dictionary nor an instance of the base class;
+- the base class was never added to the registry;
+- the dictionary has no `type`, or a `type` no registered config class uses;
+- the dictionary does not satisfy the selected config class.
+
+Two pydantic features don't support `Registered` fields:
+
+- `model_json_schema()` raises `PydanticInvalidForJsonSchema`, because pydantic can't
+  describe an instance check in JSON Schema.
+- `model_dump()` returns the built object, not its configuration dictionary.
 
 ## Rules
 
