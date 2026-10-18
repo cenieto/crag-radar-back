@@ -94,7 +94,8 @@ settings come from `.stack` and `deployments/config-ci.env`, except the Python v
   Python 3.15 builds yet.
 - **Docs:** runs `./stack build`, `./stack up ci` and `./stack docs` with the Python version
   from `.stack`. The docs are built with `--strict`, so a broken link or docstring fails
-  the job.
+  the job. On pushes to `main`, the job also publishes the site to GitHub Pages, at
+  https://cenieto.github.io/crag-radar-back/.
 
 Both jobs remove the container with `./stack down` at the end, even when a step fails.
 

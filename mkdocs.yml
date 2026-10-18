@@ -1,4 +1,5 @@
 site_name: crag-radar-back
+site_url: https://cenieto.github.io/crag-radar-back/
 site_description: Backend of Crag Radar.
 repo_url: https://github.com/cenieto/crag-radar-back
 edit_uri: edit/main/
